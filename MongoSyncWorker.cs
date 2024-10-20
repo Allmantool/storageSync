@@ -16,13 +16,13 @@ public class MongoSyncWorker : BackgroundService
     private readonly IMongoDatabase _sourceDatabase;
 
     public MongoSyncWorker(
-        ILogger<MongoSyncWorker> _logger,
+        ILogger<MongoSyncWorker> logger,
         IOperationHandlersFactory operationHandlersFactory,
         IOptions<StorageOptions> storageOptions)
     {
         _storageOptions = storageOptions.Value;
 
-        this._logger = _logger;
+        _logger = logger;
         _operationHandlersFactory = operationHandlersFactory;
 
         var sourceClient = new MongoClient(_storageOptions.SourceDatabaseConnection);
@@ -47,8 +47,7 @@ public class MongoSyncWorker : BackgroundService
         CancellationToken stoppingToken)
     {
         var sourceName = sourceCollection.CollectionNamespace.CollectionName;
-
-        using var changeStream = sourceCollection.Watch();
+        using var changeStream = await sourceCollection.WatchAsync(cancellationToken: stoppingToken);
         await changeStream.ForEachAsync(async change =>
         {
             if (stoppingToken.IsCancellationRequested)

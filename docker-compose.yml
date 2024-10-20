@@ -1,0 +1,11 @@
+services:
+  storage-sync:
+    image: storage-sync:0.0.1
+    build:
+      context: .
+    ports:
+      - "8080:80"
+    volumes:
+      - ${STORAGE_SYNC_JSON_PATH}:/app/appsettings.json:ro
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production

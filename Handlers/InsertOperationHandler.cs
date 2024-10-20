@@ -24,7 +24,7 @@ namespace StorageSyncWorker.Handlers
 
             await collection.InsertOneAsync(document);
 
-            logger.LogInformation("Document inserted in target database.");
+            logger.LogInformation($"Document inserted in target database.{sourceName}");
         }
     }
 }
