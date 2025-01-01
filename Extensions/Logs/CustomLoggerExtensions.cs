@@ -53,7 +53,7 @@ namespace StorageSyncWorker.Extensions.Logs
                         {
                             new(elasticNodeUrl)
                         },
-                        opt =>  opt.ConfigureElasticSink(environment));
+                        opt => opt.ConfigureElasticSink(environment));
         }
 
         private static void ConfigureElasticSink(this ElasticsearchSinkOptions options, IHostEnvironment environment)
