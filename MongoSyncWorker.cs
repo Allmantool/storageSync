@@ -1,7 +1,8 @@
 ﻿using Microsoft.Extensions.Options;
-
 using MongoDB.Bson;
 using MongoDB.Driver;
+
+using StorageSyncWorker.Constants;
 using StorageSyncWorker.Factories;
 using StorageSyncWorker.Models;
 
@@ -12,34 +13,46 @@ public class MongoSyncWorker : BackgroundService
     private readonly ILogger<MongoSyncWorker> _logger;
     private readonly IOperationHandlersFactory _operationHandlersFactory;
     private readonly StorageOptions _storageOptions;
-
-    private readonly IMongoDatabase _sourceDatabase;
+    private readonly MongoClient _mongoClient;
 
     public MongoSyncWorker(
         ILogger<MongoSyncWorker> logger,
         IOperationHandlersFactory operationHandlersFactory,
         IOptions<StorageOptions> storageOptions)
     {
-        _storageOptions = storageOptions.Value;
-
         _logger = logger;
         _operationHandlersFactory = operationHandlersFactory;
+        _storageOptions = storageOptions.Value;
 
-        var sourceClient = new MongoClient(_storageOptions.SourceDatabaseConnection);
-        _sourceDatabase = sourceClient.GetDatabase(_storageOptions.SourceDatabase);
+        var mongoClientSettings = MongoClientSettings.FromConnectionString(_storageOptions.SourceDatabaseConnection);
+        mongoClientSettings.ConnectTimeout = TimeSpan.FromSeconds(MongoDbOptions.ConnectTimeoutInSeconds);
+        mongoClientSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(MongoDbOptions.ServerSelectionTimeoutInSeconds);
+        mongoClientSettings.RetryReads = true;
+        mongoClientSettings.RetryWrites = true;
+
+        _mongoClient = new MongoClient(mongoClientSettings);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Start watching change streams at: " + DateTime.Now);
+        _logger.LogInformation("Starting MongoDB Change Stream Worker at: {Time}", DateTime.Now);
 
-        var sourceCollections = _storageOptions.CollectionNames
-            .Select(name => _sourceDatabase.GetCollection<BsonDocument>(name))
-            .ToList();
+        try
+        {
+            var sourceDatabase = _mongoClient.GetDatabase(_storageOptions.SourceDatabase);
 
-        var watchTasks = sourceCollections.Select(col => WatchChangeStreamAsync(col, stoppingToken));
+            var sourceCollections = _storageOptions.CollectionNames
+                .Select(name => sourceDatabase.GetCollection<BsonDocument>(name))
+                .ToList();
 
-        await Task.WhenAll(watchTasks);
+            var watchTasks = sourceCollections.Select(col => WatchChangeStreamAsync(col, stoppingToken));
+
+            await Task.WhenAll(watchTasks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while executing MongoDB Change Stream Worker.");
+        }
     }
 
     private async Task WatchChangeStreamAsync(
@@ -47,29 +60,57 @@ public class MongoSyncWorker : BackgroundService
         CancellationToken stoppingToken)
     {
         var sourceName = sourceCollection.CollectionNamespace.CollectionName;
-        using var changeStream = await sourceCollection.WatchAsync(cancellationToken: stoppingToken);
-        await changeStream.ForEachAsync(async change =>
+
+        while (!stoppingToken.IsCancellationRequested)
         {
-            if (stoppingToken.IsCancellationRequested)
+            try
             {
-                return;
+                using var changeStream = await sourceCollection.WatchAsync(cancellationToken: stoppingToken);
+                await changeStream.ForEachAsync(async change =>
+                {
+                    if (stoppingToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
+
+                    var handler = _operationHandlersFactory.GetHandler(change.OperationType);
+
+                    if (handler == null)
+                    {
+                        _logger.LogWarning(
+                            "No handler found for operation type {OperationType} in collection {CollectionName}",
+                            change.OperationType,
+                            sourceName);
+
+                        return;
+                    }
+
+                    try
+                    {
+                        await handler.HandleAsync(change, sourceName);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error handling change for collection {CollectionName}", sourceName);
+                    }
+                }, stoppingToken);
             }
-
-            var handler = _operationHandlersFactory.GetHandler(change.OperationType);
-
-            if (handler == null)
+            catch (MongoException ex) when (ex is MongoConnectionException or MongoExecutionTimeoutException)
             {
-                return;
+                _logger.LogError(ex, "MongoDB connection issue detected for collection {CollectionName}. Retrying in 5 seconds...", sourceName);
+                await Task.Delay(TimeSpan.FromSeconds(MongoDbOptions.DelayBetweenAttemptsInSeconds), stoppingToken);
             }
-
-            await handler.HandleAsync(change, sourceName);
-        }, stoppingToken);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error occurred while watching collection {CollectionName}. Retrying in 5 seconds...", sourceName);
+                await Task.Delay(TimeSpan.FromSeconds(MongoDbOptions.DelayBetweenAttemptsInSeconds), stoppingToken);
+            }
+        }
     }
 
     public override async Task StopAsync(CancellationToken stoppingToken)
     {
+        _logger.LogInformation("Stopping MongoDB Change Stream Worker at: {Time}", DateTime.Now);
         await base.StopAsync(stoppingToken);
-
-        _logger.LogInformation("MongoDB Change Stream Service is stopping.");
     }
 }

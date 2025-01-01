@@ -10,13 +10,13 @@ namespace StorageSyncWorker.Factories
     internal class OperationHandlersFactory : IOperationHandlersFactory
     {
         private readonly ILogger<OperationHandlersFactory> _logger;
-        private readonly IEnumerable<IMongoCollection<BsonDocument>> _targetCollections;
+        private readonly IReadOnlyList<IMongoCollection<BsonDocument>> _targetCollections;
 
         public OperationHandlersFactory(ILogger<OperationHandlersFactory> logger, IOptions<StorageOptions> storageOptions)
         {
             _logger = logger;
-            var storageOptionsValue = storageOptions.Value;
 
+            var storageOptionsValue = storageOptions.Value;
             var targetClient = new MongoClient(storageOptionsValue.TargetDatabaseConnection);
 
             _targetCollections = storageOptionsValue.CollectionNames

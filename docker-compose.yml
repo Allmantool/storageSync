@@ -7,5 +7,11 @@ services:
       - "8080:80"
     volumes:
       - ${STORAGE_SYNC_JSON_PATH}:/app/appsettings.json:ro
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - home-budget_elastic-network
+    restart: on-failure
+
+networks:
+  home-budget_elastic-network:
+    driver: bridge
+    external: true
