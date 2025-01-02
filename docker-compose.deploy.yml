@@ -48,8 +48,9 @@ services:
       - "27018:27017"
     volumes:
       - ${MONGO_DB_VOLUME_PATH}:/data/db
+    networks:
+      - mongo-network
 
 networks:
   mongo-network:
     driver: bridge
-    external: true
