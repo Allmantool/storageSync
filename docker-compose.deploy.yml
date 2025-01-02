@@ -1,0 +1,56 @@
+name: t1d-server
+
+services:
+  # cgm-remote-monitor service disabled
+  # cgm-remote-monitor:
+  #   container_name: cgm-remote-monitor
+  #   image: nightscout/cgm-remote-monitor:15.0.2
+  #   ports:
+  #     - 8095:3000
+  #   environment:
+  #     - MONGODB_URI=mongodb://mongoadmin:${MONGO_DB_PASSWORD}@t1d-mongo-db
+  #     - API_SECRET='*1SuperSecretPassword*'
+  #     - DISPLAY_UNITS='mmol'
+  #   networks:
+  #     - mongo-network
+
+  t1d-sync-worker:
+    image: allmantool/storage-sync:0.0.2
+    volumes:
+      - ${STORAGE_SYNC_JSON_PATH}:/app/appsettings.json:ro
+    depends_on:
+      - t1d-mongo-db
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 10
+        delay: 25s
+        window: 180s
+      resources:
+        limits:
+          cpus: "1"
+          memory: "128M"
+    networks:
+      - mongo-network
+
+  t1d-mongo-db:
+    image: mongo:7.0.5-rc0-jammy
+    container_name: t1d-mongo-db
+    restart: always
+    logging:
+      options:
+        max-size: 2g
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=mongoadmin
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_DB_PASSWORD}
+      - MONGO_INITDB_DATABASE=admin
+    ports:
+      - "27018:27017"
+    volumes:
+      - ${MONGO_DB_VOLUME_PATH}:/data/db
+    networks:
+      - mongo-network
+
+networks:
+  mongo-network:
+    driver: bridge
