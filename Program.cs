@@ -1,6 +1,7 @@
 using StorageSyncWorker.Extensions.Logs;
 using StorageSyncWorker.Factories;
 using StorageSyncWorker.Models;
+using StorageSyncWorker.Services;
 
 namespace StorageSyncWorker
 {
@@ -17,8 +18,11 @@ namespace StorageSyncWorker
                 .Build();
 
             services.Configure<StorageOptions>(builder.Configuration.GetSection("StorageOptions"));
-            services.AddHostedService<MongoSyncWorker>();
             services.AddSingleton<IOperationHandlersFactory, OperationHandlersFactory>();
+            services.AddSingleton<IDataReplicationService, DataReplicationService>();
+            services.AddSingleton<ICleanUpService, CleanUpService>();
+
+            services.AddHostedService<MongoSyncWorker>();
 
             configuration.InitializeLogger(environment, builder);
 
