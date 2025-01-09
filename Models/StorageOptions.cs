@@ -7,5 +7,6 @@
         public string SourceDatabase { get; init; }
         public string TargetDatabase { get; init; }
         public string[] CollectionNames { get; init; }
+        public int MaxPoolSize { get; init; }
     }
 }

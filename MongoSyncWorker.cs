@@ -31,6 +31,7 @@ public class MongoSyncWorker : BackgroundService
         mongoClientSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(MongoDbOptions.ServerSelectionTimeoutInSeconds);
         mongoClientSettings.RetryReads = true;
         mongoClientSettings.RetryWrites = true;
+        mongoClientSettings.MaxConnecting = _storageOptions.MaxPoolSize;
 
         _mongoClient = new MongoClient(mongoClientSettings);
         _cleanUpService = cleanUpService;
