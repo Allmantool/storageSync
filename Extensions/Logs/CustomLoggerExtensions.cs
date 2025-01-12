@@ -6,6 +6,7 @@ using Elastic.Ingest.Elasticsearch;
 using Elastic.Ingest.Elasticsearch.DataStreams;
 using Elastic.Serilog.Sinks;
 using Serilog;
+using Serilog.Core;
 using Serilog.Enrichers.Span;
 using Serilog.Events;
 using Serilog.Exceptions;
@@ -14,10 +15,10 @@ namespace StorageSyncWorker.Extensions.Logs
 {
     internal static class CustomLoggerExtensions
     {
-        public static void InitializeLogger(
+        public static Logger InitializeLogger(
             this IConfiguration configuration,
             IHostEnvironment environment,
-            IHostApplicationBuilder hostAppBuilder)
+            ILoggingBuilder loggingBuilder)
         {
             var logger = new LoggerConfiguration()
                 .MinimumLevel.Debug()
@@ -33,8 +34,10 @@ namespace StorageSyncWorker.Extensions.Logs
                 .ReadFrom.Configuration(configuration)
                 .CreateLogger();
 
-            hostAppBuilder.Logging.ClearProviders();
-            hostAppBuilder.Logging.AddSerilog(logger);
+            loggingBuilder.ClearProviders();
+            loggingBuilder.AddSerilog(logger);
+
+            return logger;
         }
 
         private static LoggerConfiguration AddElasticSearchSupport(

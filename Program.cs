@@ -24,10 +24,10 @@ namespace StorageSyncWorker
 
             services.AddHostedService<MongoSyncWorker>();
 
-            configuration.InitializeLogger(environment, builder);
+            services.AddLogging(loggingBuilder => configuration.InitializeLogger(environment, loggingBuilder));
 
             var host = builder.Build();
-            
+
             host.Run();
         }
     }
