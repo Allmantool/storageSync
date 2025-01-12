@@ -1,12 +1,27 @@
 {
     "enabledManagers": [
-        "nuget"
+        "nuget",
+        "docker-compose"
     ],
     "extends": [
-        "config:base"
+        "config:recommended"
     ],
     "nuget": {
         "enabled": true
+    },
+    "docker-compose": {
+        "enabled": true,
+        "fileMatch": [
+            "docker-compose.yml",
+            "docker-compose.override.yml"
+        ],
+        "packageRules": [
+            {
+                "matchManagers": ["docker-compose"],
+                "matchUpdateTypes": ["minor", "patch"],
+                "automerge": true
+            }
+        ]
     },
     "defaultRegistryUrls": [
         "https://api.nuget.org/v3/index.json"
