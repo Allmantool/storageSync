@@ -1,6 +1,7 @@
 ﻿using MongoDB.Bson;
 using MongoDB.Driver;
 
+using StorageSyncWorker.Constants;
 using StorageSyncWorker.Factories;
 
 namespace StorageSyncWorker.Handlers
@@ -18,12 +19,12 @@ namespace StorageSyncWorker.Handlers
                 return;
             }
 
-            var id = changeStreamDocument.DocumentKey["_id"];
+            var id = changeStreamDocument.DocumentKey[FieldNames.Id];
             var updatedFields = changeStreamDocument.UpdateDescription.UpdatedFields.Elements;
 
             logger.LogInformation($"Update detected for document with _id: {id}");
 
-            var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
+            var filter = Builders<BsonDocument>.Filter.Eq(FieldNames.Id, id);
             var update = Builders<BsonDocument>.Update.Combine(
                 updatedFields.Select(e => Builders<BsonDocument>.Update.Set(e.Name, e.Value))
             );

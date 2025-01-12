@@ -49,6 +49,12 @@ public class MongoSyncWorker : BackgroundService
                 .Select(name => sourceDatabase.GetCollection<BsonDocument>(name))
                 .ToList();
 
+            // Ensure 'sysTime' index exists for each collection
+            foreach (var collection in sourceCollections)
+            {
+                await EnsureSysTimeIndexAsync(collection);
+            }
+
             var watchAndSyncTasks = sourceCollections.Select(col => _dataReplicationService.WatchAndSyncChangeStreamAsync(col, stoppingToken));
 
             var cleanupTasks = sourceCollections.Select(col => _cleanUpService.RemoveOutdatedRecordsAsync(col, stoppingToken));
@@ -65,5 +71,30 @@ public class MongoSyncWorker : BackgroundService
     {
         _logger.LogInformation("Stopping MongoDB Change Stream Worker at: {Time}", DateTime.Now);
         await base.StopAsync(stoppingToken);
+    }
+
+    private async Task EnsureSysTimeIndexAsync(IMongoCollection<BsonDocument> collection)
+    {
+        var indexKeys = Builders<BsonDocument>.IndexKeys.Ascending(FieldNames.DateField);
+
+        // Check if the index already exists
+        var existingIndexes = await collection.Indexes.ListAsync();
+        var indexes = await existingIndexes.ToListAsync();
+
+        if (!indexes.Any(index => index["key"].AsBsonDocument.Contains(FieldNames.DateField)))
+        {
+            _logger.LogInformation("Creating index on 'sysTime' for collection: {CollectionName}", collection.CollectionNamespace.CollectionName);
+
+            await collection.Indexes.CreateOneAsync(
+                new CreateIndexModel<BsonDocument>(indexKeys),
+                new CreateOneIndexOptions()
+            );
+
+            _logger.LogInformation("Index on 'sysTime' created for collection: {CollectionName}", collection.CollectionNamespace.CollectionName);
+        }
+        else
+        {
+            _logger.LogInformation("Index on 'sysTime' already exists for collection: {CollectionName}", collection.CollectionNamespace.CollectionName);
+        }
     }
 }

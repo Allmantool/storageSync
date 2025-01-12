@@ -1,6 +1,7 @@
 ﻿using MongoDB.Bson;
 using MongoDB.Driver;
 
+using StorageSyncWorker.Constants;
 using StorageSyncWorker.Factories;
 
 namespace StorageSyncWorker.Handlers
@@ -18,11 +19,11 @@ namespace StorageSyncWorker.Handlers
                 return;
             }
 
-            var id = changeStreamDocument.DocumentKey["_id"];
+            var id = changeStreamDocument.DocumentKey[FieldNames.Id];
 
             logger.LogInformation($"Delete detected for document with _id: {id}");
 
-            var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
+            var filter = Builders<BsonDocument>.Filter.Eq(FieldNames.Id, id);
             await collection.DeleteOneAsync(filter);
 
             logger.LogInformation("Document deleted from target database.");
