@@ -15,13 +15,17 @@ namespace StorageSyncWorker.Services
             var sourceName = sourceCollection.CollectionNamespace.CollectionName;
             logger.LogInformation("Starting cleanup task for collection '{CollectionName}'", sourceName);
 
+            var cutoffDateTime = DateTime.UtcNow.AddDays(-MongoDbOptions.MaxDataAliveInDays);
+
+            // Convert the cutoff DateTime to a timestamp in milliseconds
+            var cutoffTimestamp = new DateTimeOffset(cutoffDateTime).ToUnixTimeMilliseconds();
+
+            var filter = Builders<BsonDocument>.Filter.Lt(FieldNames.DateField, cutoffTimestamp);
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    // Define the outdated record criteria (example: older than 'x' days)
-                    var filter = Builders<BsonDocument>.Filter.Lt("sysTime", DateTime.UtcNow.AddDays(-MongoDbOptions.MaxDataAliveInDays));
-
                     while (!stoppingToken.IsCancellationRequested)
                     {
                         // Find a batch of outdated records
@@ -34,8 +38,8 @@ namespace StorageSyncWorker.Services
                             break;
                         }
 
-                        var idsToDelete = outdatedRecords.Select(doc => doc["_id"]).ToList();
-                        var deleteFilter = Builders<BsonDocument>.Filter.In("_id", idsToDelete);
+                        var idsToDelete = outdatedRecords.Select(doc => doc[FieldNames.Id]).ToList();
+                        var deleteFilter = Builders<BsonDocument>.Filter.In(FieldNames.Id, idsToDelete);
 
                         var deleteResult = await sourceCollection.DeleteManyAsync(deleteFilter, stoppingToken);
 
@@ -47,7 +51,8 @@ namespace StorageSyncWorker.Services
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex,
+                    logger.LogError(
+                        ex,
                         "Error occurred during cleanup for collection '{CollectionName}'. Retrying in {DelayBetweenDeleteAttemptsInSeconds} seconds...",
                         sourceName,
                         MongoDbOptions.DelayBetweenDeleteAttemptsInSeconds);
