@@ -15,7 +15,7 @@ services:
   #     - mongo-network
 
   t1d-sync-worker:
-    image: allmantool/storage-sync:0.0.7
+    image: allmantool/storage-sync:0.0.8
     volumes:
       - ${STORAGE_SYNC_JSON_PATH}:/app/appsettings.json:ro
     depends_on:
